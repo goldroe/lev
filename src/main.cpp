@@ -36,35 +36,38 @@ int main(int argc, char **argv) {
     char *current_path = (char *)malloc(len);
     DWORD nret = GetCurrentDirectory(len, current_path);
     assert(len == nret + 1);
-    printf("Current Path: %s\n", current_path);
 
-    char *find_path = nullptr;
+    char *path = nullptr;
     if (argc > 1) {
         char *arg_path = argv[1];
-        char *path = (char *)calloc(strlen(arg_path) + 1, sizeof(char));
-        strcpy(path, arg_path);
+        path = (char *)calloc(strlen(arg_path) + 1, sizeof(char));
 
         if (PathIsRelativeA(path)) {
-            size_t n = strlen(path) + strlen(current_path) + 1;
+            size_t n = strlen(arg_path) + strlen(current_path) + 1;
             path = (char *)realloc(path, n + 1);
+            strcpy(path, current_path);
             concat_path(path, n, "\\");
-            concat_path(path, n, 
+            concat_path(path, n, arg_path);
         } else {
-            find_path = path;
+            strcpy(path, arg_path);
         }
     } else {
-        WIN32_FIND_DATAA find_data{};
-        find_path = (char *)malloc(len + 2);
-        strcpy(find_path, current_path);
-        concat_path(find_path, len + 2, "\\*");
-        printf("Find Path: %s\n", find_path);
-        HANDLE find_handle = FindFirstFileA(find_path, &find_data);
+        path = (char *)calloc(strlen(current_path) + 1, sizeof(char));
+        strcpy(path, current_path);
     }
 
-    do {
-        char *file_name = find_data.cFileName;
+    char *find_path = (char *)calloc(strlen(path) + 2, sizeof(char));
+    strcpy(find_path, path);
+    concat_path(find_path, strlen(path) + 2, "\\*");
 
-        if (strcmp(file_name, ".") == 0 || strcmp(file_name, "..") == 0) continue;
+    WIN32_FIND_DATAA find_data{};
+    HANDLE find_handle = FindFirstFileA(find_path, &find_data);
+    assert(find_handle != INVALID_HANDLE_VALUE);
+
+    printf("%s:\n", path);
+    do {
+        int64_t file_size = 0;
+        char *file_name = find_data.cFileName;
 
         size_t path_len = strlen(current_path) + strlen(find_data.cFileName);
         char *file_path = (char *)malloc(path_len + 2);
@@ -74,22 +77,21 @@ int main(int argc, char **argv) {
 
         DWORD file_attributes = find_data.dwFileAttributes;
         if (file_attributes & FILE_ATTRIBUTE_DIRECTORY) {
+            
         }
 
-        HANDLE file_handle = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-        if (file_handle == INVALID_HANDLE_VALUE) {
-            // printf("error: %d\n", GetLastError());
-            continue;
+        HANDLE file_handle = CreateFileA(file_path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (file_handle != INVALID_HANDLE_VALUE) {
+            GetFileSizeEx(file_handle, (LARGE_INTEGER *)&file_size);
         }
 
-        int64_t file_size = 0;
-        GetFileSizeEx(file_handle, (LARGE_INTEGER *)&file_size);
+        printf("%lld  %-s\n", file_size, file_name);
 
-        printf("%lld %s\n", file_size, file_name);
+        CloseHandle(file_handle);
+        free(file_path);
     } while (FindNextFileA(find_handle, &find_data));
 
     FindClose(find_handle);
-
 
     return 0;
 }
