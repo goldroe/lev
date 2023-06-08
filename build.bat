@@ -1,6 +1,6 @@
 @echo off 
 SET INCLUDES=-I ..\ext
-SET SRC=..\src\main.cpp
+SET SRC=..\code\main.cpp
 SET WARNING_FLAGS=-W4 -WX -wd4100 -wd4101 -wd4189 -wd4996 -wd4530 -wd4201 -wd4505 -wd4098 -wd4700 -wd4127
 SET COMPILER_FLAGS=-nologo -FC -MDd -Zi %WARNING_FLAGS% %INCLUDES% -Fe:lev.exe
 SET LINKER_FLAGS=-debug -SUBSYSTEM:CONSOLE Shlwapi.lib
