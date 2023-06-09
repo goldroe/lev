@@ -5,12 +5,19 @@
 #include <assert.h>
 #include <stdio.h>
 
+// NOTE: null terminated string with length
+// len does not include the null terminator
+// capacity does include the null terminator
+typedef struct {
+    char *contents;
+    size_t len;
+    size_t cap;
+} Path_Str;
 
 typedef struct {
     char *file_name;
     char *path;
     int64_t file_size;
-
     // int attributes?
 } File_Info;
 
@@ -18,11 +25,64 @@ typedef struct Directory_Node Directory_Node;
 struct Directory_Node {
     char *name;
     char *path;
-    File_Info *files;
+
+    File_Info **files;
     size_t file_num;
-    Directory_Node *children;
+    struct Directory_Node **children;
     size_t child_num;
 };
+
+void path_str_grow(Path_Str *path, size_t num) {
+    size_t old_cap = path->cap;
+    size_t new_cap = 1;
+    while (new_cap <= old_cap + num) {
+        new_cap = 2 * new_cap + 1;
+    }
+
+    path->contents = (char *)realloc(path->contents, new_cap * sizeof(char));
+    path->cap = new_cap;
+}
+
+void path_str_ensure_cap(Path_Str *path, size_t len) {
+    if (path->cap < path->len + 1 + len) {
+        path_str_grow(path, len);
+    }
+}
+
+void path_str_append_char(Path_Str *path, char ch) {
+    path_str_ensure_cap(path, 1);
+    path->contents[path->len] = ch;
+    path->contents[path->len+1] = '\0';
+    path->len++;
+}
+
+void path_str_append(Path_Str *path, char *s) {
+    size_t old_len = path->len;
+    size_t str_len = strlen(s);
+    path_str_ensure_cap(path, str_len);
+    memcpy(path->contents + old_len, s, str_len);
+    path->contents[old_len + str_len] = '\0';
+    path->len = old_len + str_len;
+}
+
+Path_Str path_str_copy(Path_Str path) {
+    Path_Str result{};
+    result.contents = (char *)malloc(path.cap);
+    memcpy(result.contents, path.contents, path.cap);
+    result.len = path.len;
+    result.cap = path.cap;
+    return result;
+}
+
+Path_Str path_str_init(char *path, size_t len) {
+    Path_Str result{};
+    result.contents = (char *)malloc(len + 1);
+    memcpy(result.contents, path, len);
+    result.contents[len] = '\0';
+    result.len = len;
+    result.cap = len;
+    return result;
+}
 
 int concat_path(char *dest, size_t dest_size, char *src) {
     size_t d = 0;
@@ -59,7 +119,7 @@ int main(int argc, char **argv) {
     char *current_path = (char *)malloc(len);
     DWORD nret = GetCurrentDirectory(len, current_path);
     assert(len == nret + 1);
-
+   
     char *path = nullptr;
     if (argc > 1) {
         char *arg_path = argv[1];
